@@ -121,7 +121,7 @@ async def main(page: ft.Page):
             page.add(followup_row)
             has_generated = True
             
-        await page.update_async()
+        await page.update()
     
     async def on_submit_click(_):
         await submit_prompt(None)
@@ -157,8 +157,14 @@ async def main(page: ft.Page):
         tabs
     ], spacing=20)
     
+    # Add all controls to the page
     page.add(layout)
-    await page.update_async()
+    
+    # Initial page update
+    await page.update()
+
+async def main_async():
+    await ft.app_async(target=main, view=ft.AppView.WEB_BROWSER)
 
 if __name__ == "__main__":
-    asyncio.run(ft.app_async(target=main))
+    asyncio.run(main_async())
