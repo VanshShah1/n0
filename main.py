@@ -1,6 +1,7 @@
 import flet as ft
 from g4f.client import Client
 import re
+import asyncio
 
 client = Client()
 
@@ -24,7 +25,7 @@ class UIComponentGenerator:
     async def generate_component(self, prompt):
         self.chat_history.append({"role": "user", "content": prompt})
         
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model="gpt-4o",
             messages=self.chat_history
         )
@@ -57,26 +58,26 @@ async def main(page: ft.Page):
         expand=True,
         filled=True,
         border_radius=15,
-        border_color=ft.colors.GREY_300,
-        on_submit=lambda e: submit_prompt(e)
+        border_color=ft.Colors.GREY_300,
+        on_submit=lambda e: asyncio.create_task(submit_prompt(e))
     )
     
     submit_btn = ft.ElevatedButton(
         "Generate",
-        icon=ft.icons.SEND,
+        icon=ft.Icons.SEND,
         style=ft.ButtonStyle(
             shape=ft.RoundedRectangleBorder(radius=10),
-            bgcolor=ft.colors.BLACK,
-            color=ft.colors.WHITE
+            bgcolor=ft.Colors.BLACK,
+            color=ft.Colors.WHITE
         )
     )
     
     preview_tab = ft.Tab(
         text="Preview",
         content=ft.Container(
-            content=ft.Html("", expand=True),
+            content=ft.Markdown("", expand=True),
             border_radius=15,
-            bgcolor=ft.colors.GREY_50,
+            bgcolor=ft.Colors.GREY_50,
             padding=10
         )
     )
@@ -85,20 +86,20 @@ async def main(page: ft.Page):
         text="Code",
         content=ft.Column([
             ft.IconButton(
-                icon=ft.icons.COPY,
-                on_click=lambda e: page.set_clipboard(current_html.value),
+                icon=ft.Icons.COPY,
+                on_click=lambda _: page.set_clipboard(current_html.value),
                 top=10,
                 right=10,
                 style=ft.ButtonStyle(
-                    bgcolor=ft.colors.WHITE,
-                    color=ft.colors.BLACK
+                    bgcolor=ft.Colors.WHITE,
+                    color=ft.Colors.BLACK
                 )
             ),
             ft.Container(
                 content=current_html,
                 expand=True,
                 border_radius=15,
-                bgcolor=ft.colors.GREY_50,
+                bgcolor=ft.Colors.GREY_50,
                 padding=20,
                 scroll=ft.ScrollMode.ALWAYS
             )
@@ -123,20 +124,20 @@ async def main(page: ft.Page):
             
         await page.update_async()
     
-    submit_btn.on_click = submit_prompt
+    submit_btn.on_click = lambda _: asyncio.create_task(submit_prompt(None))
     
     followup_field = ft.TextField(
         label="Modify your component...",
         expand=True,
         border_radius=15,
         filled=True,
-        border_color=ft.colors.GREY_300
+        border_color=ft.Colors.GREY_300
     )
     
     followup_row = ft.ResponsiveRow([
         ft.Column([
             followup_field,
-            ft.ElevatedButton("Apply Changes", on_click=submit_prompt)
+            ft.ElevatedButton("Apply Changes", on_click=lambda _: asyncio.create_task(submit_prompt(None)))
         ], col={"sm": 12, "md": 10})
     ], visible=False)
     
@@ -152,4 +153,4 @@ async def main(page: ft.Page):
     
     page.add(layout)
 
-ft.app(target=main)
+ft.app(target=main, view=ft.AppView.WEB_BROWSER)
