@@ -1,122 +1,155 @@
-import Neutron
+import flet as ft
 from g4f.client import Client
 import re
-import pyperclip
-from markupsafe import Markup
 
 client = Client()
 
-SYSTEM_PROMPT = """
-You are a professional UI/UX designer and frontend developer. Generate clean, modern, responsive HTML/CSS/JS code based on user's description.
+class UIComponentGenerator:
+    def __init__(self):
+        self.chat_history = [
+            {"role": "system", "content": """You are a professional UI/UX designer. 
+            Generate clean, modern HTML/CSS/JS code for UI components based on user prompts. 
+            Follow these rules:
+            1. Use semantic HTML5
+            2. CSS variables for theming
+            3. Mobile-first responsive design
+            4. Smooth CSS animations
+            5. Modern styling with shadows and gradients
+            6. Combine all code in one HTML file
+            7. Include interactive elements where appropriate
+            8. Use Flexbox or Grid for layouts
+            9. Add comments for key sections"""}
+        ]
 
-Rules:
-1. Respond ONLY with code inside <result> tags
-2. Combine in single HTML file
-3. Use modern CSS features
-4. No markdown or backticks
-5. Ensure valid HTML syntax
-6. Escape special characters
-7. Include proper meta tags
-
-Wrap final code in <result></result>
-"""
-
-chat_history = [{"role": "system", "content": SYSTEM_PROMPT}]
-
-def sanitize_code(code):
-    """Clean and validate generated code"""
-    code = re.sub(r'```html|```', '', code)
-    code = re.sub(r'<think>.*?</think>', '', code, flags=re.DOTALL)
-    return Markup(code.strip())
-
-def extract_code(response):
-    match = re.search(r'<result>(.*?)</result>', response, re.DOTALL)
-    return sanitize_code(match.group(1)) if match else None
-
-def generate_component(prompt):
-    global chat_history
-    chat_history.append({"role": "user", "content": prompt})
-    
-    try:
+    async def generate_component(self, prompt):
+        self.chat_history.append({"role": "user", "content": prompt})
+        
         response = client.chat.completions.create(
             model="gpt-4o",
-            messages=chat_history
+            messages=self.chat_history
         )
-        ai_message = response.choices[0].message.content
-        chat_history.append({"role": "assistant", "content": ai_message})
-        return extract_code(ai_message)
-    except Exception as e:
-        print(f"AI Error: {str(e)}")
-        return None
+        
+        content = response.choices[0].message.content
+        self.chat_history.append({"role": "assistant", "content": content})
+        
+        html_content = re.sub(r'``````', '', content).strip()
+        return html_content
 
-win = Neutron.Window("UI Craft AI", size=(1200, 800), css="def.css")
-win.display(file="render.html")
-
-def update_ui(code):
-    if not code:
-        return
+async def main(page: ft.Page):
+    page.title = "AI Component Studio"
+    page.theme_mode = ft.ThemeMode.LIGHT
+    page.fonts = {"primary": "Roboto"}
+    page.padding = 20
     
-    # Create safe iframe content
-    iframe_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <base target="_blank">
-        <style>
-            body {{ 
-                margin: 0;
-                padding: 1rem;
-                font-family: inherit;
-            }}
-            {code.split('<style>')[-1].split('</style>')[0] if '<style>' in code else ''}
-        </style>
-    </head>
-    <body>
-        {code.split('<body>')[-1].split('</body>')[0] if '<body>' in code else code}
-    </body>
-    </html>
-    """
+    generator = UIComponentGenerator()
+    current_html = ft.Text()
+    has_generated = False
     
-    preview_frame = win.getElementById("previewFrame")
-    preview_frame.srcdoc = iframe_content
+    # UI Components
+    title = ft.Text("AI Component Studio", size=24, weight="bold", text_align="center")
     
-    code_content = win.getElementById("codeContent")
-    code_content.textContent = iframe_content
+    prompt_field = ft.TextField(
+        label="Describe your UI component",
+        hint_text="e.g., 'A modern login form with gradient background and hover effects'",
+        multiline=True,
+        min_lines=1,
+        max_lines=3,
+        expand=True,
+        filled=True,
+        border_radius=15,
+        border_color=ft.colors.GREY_300,
+        on_submit=lambda e: submit_prompt(e)
+    )
     
-    win.getElementById("followUpSection").classList.remove("hidden")
+    submit_btn = ft.ElevatedButton(
+        "Generate",
+        icon=ft.icons.SEND,
+        style=ft.ButtonStyle(
+            shape=ft.RoundedRectangleBorder(radius=10),
+            bgcolor=ft.colors.BLACK,
+            color=ft.colors.WHITE
+        )
+    )
+    
+    preview_tab = ft.Tab(
+        text="Preview",
+        content=ft.Container(
+            content=ft.Html("", expand=True),
+            border_radius=15,
+            bgcolor=ft.colors.GREY_50,
+            padding=10
+        )
+    )
+    
+    code_tab = ft.Tab(
+        text="Code",
+        content=ft.Column([
+            ft.IconButton(
+                icon=ft.icons.COPY,
+                on_click=lambda e: page.set_clipboard(current_html.value),
+                top=10,
+                right=10,
+                style=ft.ButtonStyle(
+                    bgcolor=ft.colors.WHITE,
+                    color=ft.colors.BLACK
+                )
+            ),
+            ft.Container(
+                content=current_html,
+                expand=True,
+                border_radius=15,
+                bgcolor=ft.colors.GREY_50,
+                padding=20,
+                scroll=ft.ScrollMode.ALWAYS
+            )
+        ], spacing=0)
+    )
+    
+    tabs = ft.Tabs(
+        tabs=[preview_tab, code_tab],
+        expand=True,
+        animation_duration=300
+    )
+    
+    async def submit_prompt(e):
+        nonlocal has_generated
+        html_code = await generator.generate_component(prompt_field.value)
+        current_html.value = html_code
+        preview_tab.content.content.value = html_code
+        
+        if not has_generated:
+            page.add(followup_row)
+            has_generated = True
+            
+        await page.update_async()
+    
+    submit_btn.on_click = submit_prompt
+    
+    followup_field = ft.TextField(
+        label="Modify your component...",
+        expand=True,
+        border_radius=15,
+        filled=True,
+        border_color=ft.colors.GREY_300
+    )
+    
+    followup_row = ft.ResponsiveRow([
+        ft.Column([
+            followup_field,
+            ft.ElevatedButton("Apply Changes", on_click=submit_prompt)
+        ], col={"sm": 12, "md": 10})
+    ], visible=False)
+    
+    layout = ft.Column([
+        title,
+        ft.ResponsiveRow([
+            ft.Column([prompt_field], col={"sm": 12, "md": 10}),
+            ft.Column([submit_btn], col={"sm": 12, "md": 2})
+        ], vertical_alignment="center"),
+        ft.Divider(),
+        tabs
+    ], spacing=20)
+    
+    page.add(layout)
 
-def handle_submit():
-    prompt = win.getElementById("promptInput").value
-    if prompt:
-        code = generate_component(prompt)
-        if code:
-            update_ui(code)
-        win.getElementById("promptInput").value = ""
-
-def handle_follow_up():
-    prompt = win.getElementById("followUpInput").value
-    if prompt:
-        code = generate_component(prompt)
-        if code:
-            update_ui(code)
-        win.getElementById("followUpInput").value = ""
-
-# Fixed event listeners
-win.getElementById("submitBtn").addEventListener("click", Neutron.event(handle_submit))
-win.getElementById("promptInput").addEventListener("keypress", 
-    Neutron.event(lambda: handle_submit() if win.getElementById("promptInput").value else None))
-
-win.getElementById("followUpBtn").addEventListener("click", Neutron.event(handle_follow_up))
-win.getElementById("followUpInput").addEventListener("keypress", 
-    Neutron.event(lambda: handle_follow_up() if win.getElementById("followUpInput").value else None))
-
-def copy_code():
-    code = win.getElementById("codeContent").textContent
-    pyperclip.copy(code)
-    print("Code copied to clipboard!")
-
-win.getElementById("copyBtn").addEventListener("click", Neutron.event(copy_code))
-
-win.show()
+ft.app(target=main, view=ft.AppView.WEB_BROWSER)
