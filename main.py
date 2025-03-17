@@ -99,8 +99,7 @@ async def main(page: ft.Page):
                 expand=True,
                 border_radius=15,
                 bgcolor=ft.Colors.GREY_50,
-                padding=20,
-                scroll=ft.ScrollMode.ALWAYS
+                padding=20
             )
         ], spacing=0)
     )
