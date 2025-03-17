@@ -59,7 +59,6 @@ async def main(page: ft.Page):
         filled=True,
         border_radius=15,
         border_color=ft.Colors.GREY_300,
-        on_submit=lambda e: asyncio.create_task(submit_prompt(e))
     )
     
     submit_btn = ft.ElevatedButton(
@@ -112,7 +111,7 @@ async def main(page: ft.Page):
         animation_duration=300
     )
     
-    async def submit_prompt(e):
+    async def submit_prompt(_):
         nonlocal has_generated
         html_code = await generator.generate_component(prompt_field.value)
         current_html.value = html_code
@@ -124,7 +123,11 @@ async def main(page: ft.Page):
             
         await page.update_async()
     
-    submit_btn.on_click = lambda _: asyncio.create_task(submit_prompt(None))
+    async def on_submit_click(_):
+        await submit_prompt(None)
+
+    submit_btn.on_click = on_submit_click
+    prompt_field.on_submit = on_submit_click
     
     followup_field = ft.TextField(
         label="Modify your component...",
@@ -134,10 +137,13 @@ async def main(page: ft.Page):
         border_color=ft.Colors.GREY_300
     )
     
+    async def on_apply_changes(_):
+        await submit_prompt(None)
+
     followup_row = ft.ResponsiveRow([
         ft.Column([
             followup_field,
-            ft.ElevatedButton("Apply Changes", on_click=lambda _: asyncio.create_task(submit_prompt(None)))
+            ft.ElevatedButton("Apply Changes", on_click=on_apply_changes)
         ], col={"sm": 12, "md": 10})
     ], visible=False)
     
@@ -152,5 +158,7 @@ async def main(page: ft.Page):
     ], spacing=20)
     
     page.add(layout)
+    await page.update_async()
 
-ft.app(target=main, view=ft.AppView.WEB_BROWSER)
+if __name__ == "__main__":
+    asyncio.run(ft.app_async(target=main))
